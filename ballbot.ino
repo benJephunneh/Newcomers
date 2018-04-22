@@ -46,7 +46,7 @@ int Perror = 0, Rerror = 0;     // Deviation from desired upright point based on
 // Other variables - P for pitch, R for roll
 float Pangle = 0, PlastAngle = 0, Rangle = 0, RlastAngle = 0; // Current and previous angle values
 float PangularVelocity = 0, RangularVelocity = 0;      // Angular velocity of robot
-float PbalancePoint = 4.25, RbalancePoint = 2.25;       // An offset to couteract the misaligned center of gravity
+float PbalancePoint = 4.25, RbalancePoint = 2.25;       // An offset to counteract the misaligned center of gravity
 short signed int Pintegral = 0, Rintegral = 0;  // The "integral" of the plotted angles
 
 float angle;
