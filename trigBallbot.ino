@@ -37,8 +37,10 @@ void dmpDataReady() {
   mpuInterrupt = true;
 }
 
-float Rangle, Pangle;
-float PbalancePoint = 7.3, RbalancePoint = .2;       // An offset to couteract the misaligned center of gravity
+float Rangle, Pangle, PlastAngle = 0, RlastAngle = 0;
+float PbalancePoint = 6.4, RbalancePoint = .6;       // An offset to couteract the misaligned center of gravity
+float PangularVelocity = 0, RangularVelocity = 0;      // Angular velocity of robot
+bool flag = true;
  
 void setup() {
   mpuSetup();
@@ -50,21 +52,18 @@ void setup() {
 // ==========================================================================================
  
 void loop() {
-  mpuLoop();
+ mpuLoop();
  
   // Converting the angles into degrees (P for pitch, R for roll):
   Rangle = (ypr[1] * 180/M_PI) - RbalancePoint;
   Pangle = (ypr[2] * 180/M_PI) - PbalancePoint;
- 
-// ==========================================================================================
-//                                 Print Statements
-// ==========================================================================================
 
-  Serial.print("Angles (P R):\t");
-  Serial.print(Pangle);
-  Serial.print("\t");
-  Serial.print(Rangle);
-  Serial.print("\t");
+  // Determining the rate of angle change:
+  PangularVelocity = Pangle - PlastAngle;
+  RangularVelocity = Rangle - RlastAngle;
+
+  PlastAngle = Pangle;
+  RlastAngle = Rangle;
  
 // ==========================================================================================
 //                    Setting the speed and direction of the motors
@@ -72,23 +71,24 @@ void loop() {
  
 double magnitude = sqrt(sq(Pangle) + sq(Rangle));
 double dir       = -magnitude;
-dir = map(abs(dir),0,12,140,255);
+//dir = map(abs(dir),0,13,135,255);
+dir = fscale(0,10,130,255,abs(dir),-1.5);
  
 double theta = atan2((Rangle * M_PI / 180),(Pangle * M_PI / 180));
  
 if(theta < 0){
   theta = (2 * M_PI) + theta;
 }
- 
+
 double m1Speed   = (dir * sin((90*M_PI/180)  - theta));
 double m2Speed   = (dir * sin((216*M_PI/180) - theta));
 double m3Speed   = (dir * sin((340*M_PI/180) - theta));
 
-/*if(magnitude < .5){
+if(magnitude < .4){
   motor1->run(RELEASE);
   motor2->run(RELEASE);
   motor3->run(RELEASE);
-}*/
+}
  
 if(m1Speed > 0) {       motor1->run(FORWARD);}
 else if(m1Speed == 0) { motor1->run(RELEASE);}
@@ -108,7 +108,22 @@ if(m3Speed > 255){m3Speed = 255;}
 motor1->setSpeed(abs(m1Speed));
 motor2->setSpeed(abs(m2Speed));
 motor3->setSpeed(abs(m3Speed));
- 
+
+// ==========================================================================================
+//                                 Print Statements
+// ==========================================================================================
+
+  Serial.print("Angles (P R):\t");
+  Serial.print(Pangle);
+  Serial.print("\t");
+  Serial.print(Rangle);
+  Serial.print("\t");
+
+  /*Serial.print("AngleChange (P R):\t");
+  Serial.print(PangularVelocity);
+  Serial.print("\t");
+  Serial.print(RangularVelocity);
+  Serial.print("\t");*/
  
   Serial.print("Theta:\t");
   Serial.print(theta * 180 / M_PI);
@@ -229,4 +244,78 @@ void mpuLoop(){
     mpu.dmpGetGravity(&gravity, &q);
     mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
   }
+}
+
+float fscale( float originalMin, float originalMax, float newBegin, float
+newEnd, float inputValue, float curve){
+
+  float OriginalRange = 0;
+  float NewRange = 0;
+  float zeroRefCurVal = 0;
+  float normalizedCurVal = 0;
+  float rangedValue = 0;
+  boolean invFlag = 0;
+
+
+  // condition curve parameter
+  // limit range
+
+  if (curve > 10) curve = 10;
+  if (curve < -10) curve = -10;
+
+  curve = (curve * -.1) ; // - invert and scale - this seems more intuitive - postive numbers give more weight to high end on output 
+  curve = pow(10, curve); // convert linear scale into lograthimic exponent for other pow function
+
+  /*
+   Serial.println(curve * 100, DEC);   // multply by 100 to preserve resolution  
+   Serial.println(); 
+   */
+
+  // Check for out of range inputValues
+  if (inputValue < originalMin) {
+    inputValue = originalMin;
+  }
+  if (inputValue > originalMax) {
+    inputValue = originalMax;
+  }
+
+  // Zero Refference the values
+  OriginalRange = originalMax - originalMin;
+
+  if (newEnd > newBegin){ 
+    NewRange = newEnd - newBegin;
+  }
+  else
+  {
+    NewRange = newBegin - newEnd; 
+    invFlag = 1;
+  }
+
+  zeroRefCurVal = inputValue - originalMin;
+  normalizedCurVal  =  zeroRefCurVal / OriginalRange;   // normalize to 0 - 1 float
+
+  /*
+  Serial.print(OriginalRange, DEC);  
+   Serial.print("   ");  
+   Serial.print(NewRange, DEC);  
+   Serial.print("   ");  
+   Serial.println(zeroRefCurVal, DEC);  
+   Serial.println();  
+   */
+
+  // Check for originalMin > originalMax  - the math for all other cases i.e. negative numbers seems to work out fine 
+  if (originalMin > originalMax ) {
+    return 0;
+  }
+
+  if (invFlag == 0){
+    rangedValue =  (pow(normalizedCurVal, curve) * NewRange) + newBegin;
+
+  }
+  else     // invert the ranges
+  {   
+    rangedValue =  newBegin - (pow(normalizedCurVal, curve) * NewRange); 
+  }
+
+  return rangedValue;
 }
