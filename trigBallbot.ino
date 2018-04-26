@@ -38,7 +38,7 @@ void dmpDataReady() {
 }
 
 float Rangle, Pangle, PlastAngle = 0, RlastAngle = 0;
-float PbalancePoint = 6.4, RbalancePoint = .6;       // An offset to couteract the misaligned center of gravity
+float PbalancePoint = 4.1, RbalancePoint = -.2;       // An offset to couteract the misaligned center of gravity
 float PangularVelocity = 0, RangularVelocity = 0;      // Angular velocity of robot
 bool flag = true;
  
@@ -64,47 +64,56 @@ void loop() {
 
   PlastAngle = Pangle;
   RlastAngle = Rangle;
+
  
 // ==========================================================================================
 //                    Setting the speed and direction of the motors
 // ==========================================================================================
- 
-double magnitude = sqrt(sq(Pangle) + sq(Rangle));
-double dir       = -magnitude;
-//dir = map(abs(dir),0,13,135,255);
-dir = fscale(0,10,130,255,abs(dir),-1.5);
- 
+
+// Magnitude to correct is opposite but equal to amount of lean
+double magnitude = -sqrt(sq(Pangle) + sq(Rangle)); 
+
+// Theta = angle to correct towards. Range = [0, 2pi]
 double theta = atan2((Rangle * M_PI / 180),(Pangle * M_PI / 180));
- 
+
 if(theta < 0){
   theta = (2 * M_PI) + theta;
 }
 
-double m1Speed   = (dir * sin((90*M_PI/180)  - theta));
-double m2Speed   = (dir * sin((216*M_PI/180) - theta));
-double m3Speed   = (dir * sin((340*M_PI/180) - theta));
+  Serial.print("Theta:\t");
+  Serial.print(theta * 180 / M_PI);
+  Serial.print("\t");
+  Serial.print("Magnitude:\t");
+  Serial.print(magnitude);
+  Serial.print("\t");
 
-if(magnitude < .4){
-  motor1->run(RELEASE);
-  motor2->run(RELEASE);
-  motor3->run(RELEASE);
-}
- 
-if(m1Speed > 0) {       motor1->run(FORWARD);}
-else if(m1Speed == 0) { motor1->run(RELEASE);}
-else {                  motor1->run(BACKWARD);}
-if(m2Speed > 0) {       motor2->run(FORWARD);}
-else if(m1Speed == 0) { motor2->run(RELEASE);}
-else {                  motor2->run(BACKWARD);}
-if(m3Speed > 0) {       motor3->run(FORWARD);}
-else if(m1Speed == 0) { motor3->run(RELEASE);}
-else {                  motor3->run(BACKWARD);}
- 
+// Map magnitude of correction [0, 10] (our choice) to possible wheel speeds [0, 255]
+// with 1.5 weight towards lower end of range (exponentially increase speed).
+if (abs(magnitude) > 11) {magnitude = 11;}
+magnitude = fscale(0,11,125,255,abs(magnitude),-5);
+
+double m1Speed   = (magnitude * sin((90*M_PI/180)  - theta));
+double m2Speed   = (magnitude * sin((216*M_PI/180) - theta));
+double m3Speed   = (magnitude * sin((340*M_PI/180) - theta));
 
 if(m1Speed > 255){m1Speed = 255;}
 if(m2Speed > 255){m2Speed = 255;}
 if(m3Speed > 255){m3Speed = 255;}
- 
+
+if(m1Speed > 0) {motor1->run(FORWARD);}
+else {           motor1->run(BACKWARD);}
+if(m2Speed > 0) {motor2->run(FORWARD);}
+else {           motor2->run(BACKWARD);}
+if(m3Speed > 0) {motor3->run(FORWARD);}
+else {           motor3->run(BACKWARD);}
+
+
+/*if(abs(magnitude) < .5){
+  motor1->run(RELEASE);
+  motor2->run(RELEASE);
+  motor3->run(RELEASE);
+}*/
+
 motor1->setSpeed(abs(m1Speed));
 motor2->setSpeed(abs(m2Speed));
 motor3->setSpeed(abs(m3Speed));
@@ -118,19 +127,13 @@ motor3->setSpeed(abs(m3Speed));
   Serial.print("\t");
   Serial.print(Rangle);
   Serial.print("\t");
-
+  
   /*Serial.print("AngleChange (P R):\t");
   Serial.print(PangularVelocity);
   Serial.print("\t");
   Serial.print(RangularVelocity);
   Serial.print("\t");*/
  
-  Serial.print("Theta:\t");
-  Serial.print(theta * 180 / M_PI);
-  Serial.print("\t");
-  Serial.print("Magnitude:\t");
-  Serial.print(magnitude);
-  Serial.print("\t");
   Serial.print("M1 Speed:\t");
   Serial.print(m1Speed);
   Serial.print("\t");
